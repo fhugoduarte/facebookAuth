@@ -1,113 +1,106 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow
- */
-
-import React, {Fragment} from 'react';
+import React, {Fragment, useCallback, useState} from 'react';
 import {
   SafeAreaView,
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
   StatusBar,
+  StyleSheet,
+  ActivityIndicator,
+  Text,
+  View,
 } from 'react-native';
 
 import {
-  Header,
-  LearnMoreLinks,
-  Colors,
-  DebugInstructions,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  LoginButton,
+  GraphRequest,
+  GraphRequestManager,
+  AccessToken,
+} from 'react-native-fbsdk';
 
 const App = () => {
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const getUserCallback = useCallback((error, result) => {
+    setLoading(false);
+    if (error) {
+      console.log('error', error);
+    } else {
+      setUser(result);
+    }
+  }, []);
+
+  const getUserInfo = useCallback(
+    token => {
+      const infoRequest = new GraphRequest(
+        '/me',
+        {
+          accessToken: token,
+          parameters: {
+            fields: {string: 'email, name'},
+          },
+        },
+        getUserCallback,
+      );
+
+      new GraphRequestManager().addRequest(infoRequest).start();
+      setLoading(true);
+    },
+    [getUserCallback],
+  );
+
   return (
     <Fragment>
       <StatusBar barStyle="dark-content" />
-      <SafeAreaView>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          style={styles.scrollView}>
-          <Header />
-          {global.HermesInternal == null ? null : (
-            <View style={styles.engine}>
-              <Text style={styles.footer}>Engine: Hermes</Text>
-            </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          {loading && <ActivityIndicator />}
+          {user && (
+            <Fragment>
+              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+            </Fragment>
           )}
-          <View style={styles.body}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Step One</Text>
-              <Text style={styles.sectionDescription}>
-                Edit <Text style={styles.highlight}>App.js</Text> to change this
-                screen and then come back to see your edits.
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>See Your Changes</Text>
-              <Text style={styles.sectionDescription}>
-                <ReloadInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Debug</Text>
-              <Text style={styles.sectionDescription}>
-                <DebugInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Learn More</Text>
-              <Text style={styles.sectionDescription}>
-                Read the docs to discover what to do next:
-              </Text>
-            </View>
-            <LearnMoreLinks />
-          </View>
-        </ScrollView>
+        </View>
+
+        <LoginButton
+          permissions={['email', 'public_profile']}
+          onLoginFinished={async (error, result) => {
+            if (error) {
+              console.log('error', error);
+            } else if (result.isCancelled) {
+              console.log('isCancelled');
+            } else {
+              const {accessToken} = await AccessToken.getCurrentAccessToken();
+
+              getUserInfo(accessToken);
+            }
+          }}
+          onLogoutFinished={() => setUser(null)}
+        />
       </SafeAreaView>
     </Fragment>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollView: {
-    backgroundColor: Colors.lighter,
+  container: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  engine: {
-    position: 'absolute',
-    right: 0,
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
-  body: {
-    backgroundColor: Colors.white,
-  },
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.black,
-  },
-  sectionDescription: {
-    marginTop: 8,
+  userName: {
+    fontWeight: 'bold',
+    color: '#333',
     fontSize: 18,
-    fontWeight: '400',
-    color: Colors.dark,
   },
-  highlight: {
-    fontWeight: '700',
-  },
-  footer: {
-    color: Colors.dark,
-    fontSize: 12,
-    fontWeight: '600',
-    padding: 4,
-    paddingRight: 12,
-    textAlign: 'right',
+  userEmail: {
+    color: '#888',
+    fontSize: 14,
   },
 });
 
